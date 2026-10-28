@@ -66,8 +66,8 @@ function calculateBill(items) {
 }
 
 function calculateComplimentaryRewards(originalPaise, bunChoice = "") {
-  const gulabJamun = originalPaise > 23000n;
-  const bunUnlocked = originalPaise > 25000n;
+  const gulabJamun = originalPaise >= 23000n;
+  const bunUnlocked = originalPaise >= 25000n;
   const selectedBun = bunUnlocked && (bunChoice === "kova" || bunChoice === "muska")
     ? bunChoice
     : "";
@@ -194,14 +194,14 @@ if (typeof document !== "undefined") {
       rewardElements.gulabStatus.textContent = rewards.gulabJamun ? "Unlocked" : "Locked";
       rewardElements.gulabMessage.textContent = rewards.gulabJamun
         ? "A sweet treat is on us!"
-        : `Add ${formatMoney(23001n - originalTotalPaise)} more to unlock`;
+        : `Add ${formatMoney(23000n - originalTotalPaise)} more to unlock`;
 
       rewardElements.bunCard.classList.toggle("is-earned", rewards.bunUnlocked);
       rewardElements.bunStatus.hidden = rewards.bunUnlocked;
       rewardElements.bunChoiceWrap.hidden = !rewards.bunUnlocked;
       rewardElements.bunMessage.textContent = rewards.bunUnlocked
         ? "Choose one complimentary bun."
-        : `Add ${formatMoney(25001n - originalTotalPaise)} more to unlock`;
+        : `Add ${formatMoney(25000n - originalTotalPaise)} more to unlock`;
 
       const complimentaryItems = [];
       if (rewards.gulabJamun) complimentaryItems.push("Gulab Jamun");
