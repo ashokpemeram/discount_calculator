@@ -57,8 +57,9 @@
               <thead>
                 <tr>
                   <th scope="col" class="name-column">Item name</th>
+                  <th scope="col" class="type-column">Snack type</th>
                   <th scope="col" class="price-column">Original price <span>(₹)</span></th>
-                  <th scope="col" class="discount-column">Discount <span>(%)</span></th>
+                  <th scope="col" class="discount-column">Discount <span>(auto %)</span></th>
                   <th scope="col" class="amount-column">You save <span>(₹)</span></th>
                   <th scope="col" class="final-column">Final price <span>(₹)</span></th>
                   <th scope="col" class="action-column"><span class="sr-only">Actions</span></th>
@@ -79,6 +80,34 @@
               Clear all
             </button>
           </div>
+
+          <section class="gift-panel" aria-labelledby="gift-heading">
+            <div class="gift-panel-heading">
+              <span class="gift-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7H8.5a2 2 0 1 1 2-2c0 1.1 1.5 2 1.5 2Zm0 0h3.5a2 2 0 1 0-2-2c0 1.1-1.5 2-1.5 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <div><h3 id="gift-heading">A little something on us</h3><p>Complimentary treats are based on your original total, before discounts.</p></div>
+            </div>
+            <div class="gift-rewards">
+              <article class="gift-reward" id="reward-gulab">
+                <span class="reward-icon" aria-hidden="true">✿</span>
+                <div class="reward-copy"><h4>Gulab Jamun</h4><p id="gulab-message">Unlocks when your original total is over ₹230</p></div>
+                <span class="reward-status" id="gulab-status">Locked</span>
+              </article>
+              <article class="gift-reward" id="reward-bun">
+                <span class="reward-icon bun-icon" aria-hidden="true">✦</span>
+                <div class="reward-copy"><h4>Kova Bun or Muska Bun</h4><p id="bun-message">Unlocks when your original total is over ₹250</p></div>
+                <span class="reward-status" id="bun-status">Locked</span>
+                <label class="bun-choice-wrap" id="bun-choice-wrap" hidden>
+                  <span class="sr-only">Choose your complimentary bun</span>
+                  <select id="bun-choice" aria-label="Choose your complimentary bun">
+                    <option value="">Choose one</option>
+                    <option value="kova">Kova Bun</option>
+                    <option value="muska">Muska Bun</option>
+                  </select>
+                </label>
+              </article>
+            </div>
+            <p class="gift-print-summary print-value" id="gift-print-summary"></p>
+          </section>
           <p class="sr-only" id="form-announcement" aria-live="polite"></p>
         </section>
 
@@ -121,14 +150,21 @@
           <input class="item-name" type="text" maxlength="60" placeholder="e.g. Masala chips" autocomplete="off" aria-label="Item name">
           <span class="print-value print-name"></span>
         </td>
+        <td class="type-cell" data-label="Snack type">
+          <select class="item-type" aria-label="Snack type">
+            <option value="">Choose type</option>
+            <option value="veg">Veg (15%)</option>
+            <option value="nonveg">Non-Veg (10%)</option>
+          </select>
+          <span class="print-value print-type"></span>
+        </td>
         <td class="price-cell" data-label="Original price (₹)">
           <label class="input-prefix"><span aria-hidden="true">₹</span><input class="item-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="Original price in rupees"></label>
           <span class="validation-error" hidden></span>
           <span class="print-value print-price"></span>
         </td>
         <td class="discount-cell" data-label="Discount (%)">
-          <label class="input-suffix"><input class="item-discount" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="0" aria-label="Discount percentage"><span aria-hidden="true">%</span></label>
-          <span class="validation-error" hidden></span>
+          <span class="discount-rate">—</span>
           <span class="print-value print-discount"></span>
         </td>
         <td class="discount-amount-cell" data-label="You save (₹)"><span class="cell-currency item-discount-amount">₹0.00</span><span class="print-value print-amount"></span></td>

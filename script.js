@@ -6,6 +6,7 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0,
 });
 const discountFormatter = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
+const SNACK_DISCOUNTS = Object.freeze({ veg: 15, nonveg: 10 });
 
 function rupeesToPaise(value) {
   const rawValue = String(value ?? "").trim();
@@ -35,11 +36,10 @@ function rupeesToPaise(value) {
   return quotient + (remainder * 2n >= divisor ? 1n : 0n);
 }
 
-function calculateLineItem(priceValue, discountValue) {
+function calculateLineItem(priceValue, snackType) {
   const originalPaise = rupeesToPaise(priceValue);
-  const enteredDiscount = Number.parseFloat(discountValue);
-  const discountPercent = Number.isFinite(enteredDiscount)
-    ? Math.min(100, Math.max(0, enteredDiscount))
+  const discountPercent = Object.hasOwn(SNACK_DISCOUNTS, snackType)
+    ? SNACK_DISCOUNTS[snackType]
     : 0;
   const discountBasisPoints = BigInt(Math.round(discountPercent * 100));
   const discountPaise = (originalPaise * discountBasisPoints + 5000n) / 10000n;
@@ -55,7 +55,7 @@ function calculateLineItem(priceValue, discountValue) {
 function calculateBill(items) {
   return items.reduce(
     (totals, item) => {
-      const line = calculateLineItem(item.price, item.discount);
+      const line = calculateLineItem(item.price, item.type);
       totals.originalPaise += line.originalPaise;
       totals.discountPaise += line.discountPaise;
       totals.grandPaise += line.finalPaise;
@@ -63,6 +63,15 @@ function calculateBill(items) {
     },
     { originalPaise: 0n, discountPaise: 0n, grandPaise: 0n }
   );
+}
+
+function calculateComplimentaryRewards(originalPaise, bunChoice = "") {
+  const gulabJamun = originalPaise > 23000n;
+  const bunUnlocked = originalPaise > 25000n;
+  const selectedBun = bunUnlocked && (bunChoice === "kova" || bunChoice === "muska")
+    ? bunChoice
+    : "";
+  return { gulabJamun, bunUnlocked, selectedBun };
 }
 
 function formatMoney(paise) {
@@ -73,7 +82,13 @@ function formatMoney(paise) {
 
 // These pure helpers can be checked with Node; browsers simply ignore this export.
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { rupeesToPaise, calculateLineItem, calculateBill, formatMoney };
+  module.exports = {
+    rupeesToPaise,
+    calculateLineItem,
+    calculateBill,
+    calculateComplimentaryRewards,
+    formatMoney,
+  };
 }
 
 if (typeof document !== "undefined") {
@@ -82,21 +97,31 @@ if (typeof document !== "undefined") {
     const rowTemplate = document.querySelector("#item-row-template");
     const itemCount = document.querySelector("#item-count");
     const announcement = document.querySelector("#form-announcement");
+    const bunChoice = document.querySelector("#bun-choice");
+    const rewardElements = {
+      gulabCard: document.querySelector("#reward-gulab"),
+      gulabMessage: document.querySelector("#gulab-message"),
+      gulabStatus: document.querySelector("#gulab-status"),
+      bunCard: document.querySelector("#reward-bun"),
+      bunMessage: document.querySelector("#bun-message"),
+      bunStatus: document.querySelector("#bun-status"),
+      bunChoiceWrap: document.querySelector("#bun-choice-wrap"),
+      printSummary: document.querySelector("#gift-print-summary"),
+    };
     const totalElements = {
       original: document.querySelector("#original-total"),
       discount: document.querySelector("#discount-total"),
       grand: document.querySelector("#grand-total"),
     };
 
-    function addItemRow({ name = "", price = "", discount = "" } = {}) {
+    function addItemRow({ name = "", price = "" } = {}) {
       const row = rowTemplate.content.firstElementChild.cloneNode(true);
       const nameInput = row.querySelector(".item-name");
+      const typeInput = row.querySelector(".item-type");
       const priceInput = row.querySelector(".item-price");
-      const discountInput = row.querySelector(".item-discount");
 
       nameInput.value = name;
       priceInput.value = price;
-      discountInput.value = discount;
       row.querySelector(".remove-item").addEventListener("click", () => {
         const itemName = nameInput.value.trim() || "Item";
         row.remove();
@@ -105,10 +130,9 @@ if (typeof document !== "undefined") {
       });
 
       nameInput.addEventListener("input", updateBill);
+      typeInput.addEventListener("change", updateBill);
       priceInput.addEventListener("input", handleNumericInput);
-      discountInput.addEventListener("input", handleNumericInput);
       priceInput.addEventListener("change", commitNumericInput);
-      discountInput.addEventListener("change", commitNumericInput);
 
       itemsBody.append(row);
       updateBill();
@@ -122,9 +146,6 @@ if (typeof document !== "undefined") {
       const value = Number(input.value);
       if (!Number.isFinite(value)) return "Enter a valid number.";
       if (value < 0) return "Value cannot be negative.";
-      if (input.classList.contains("item-discount") && value > 100) {
-        return "Discount must be between 0% and 100%.";
-      }
       return "";
     }
 
@@ -147,22 +168,54 @@ if (typeof document !== "undefined") {
       const input = event.currentTarget;
       if (input.validity.badInput) {
         input.value = "";
-      } else if (input.value.trim() !== "") {
-        const value = Number(input.value);
-        if (value < 0) input.value = "0";
-        if (input.classList.contains("item-discount") && value > 100) input.value = "100";
+      } else if (input.value.trim() !== "" && Number(input.value) < 0) {
+        input.value = "0";
       }
       showValidation(input, "");
       updateBill();
     }
 
-    function setPrintValues(row, pricePaise, discountPercent, discountPaise, finalPaise) {
+    function setPrintValues(row, snackType, pricePaise, discountPercent, discountPaise, finalPaise) {
       const name = row.querySelector(".item-name").value.trim();
+      const hasSnackType = Object.hasOwn(SNACK_DISCOUNTS, snackType);
+      row.classList.toggle("has-discount", hasSnackType);
       row.querySelector(".print-name").textContent = name || "—";
+      row.querySelector(".print-type").textContent = snackType === "veg" ? "Veg" : snackType === "nonveg" ? "Non-Veg" : "—";
       row.querySelector(".print-price").textContent = formatMoney(pricePaise);
-      row.querySelector(".print-discount").textContent = `${discountFormatter.format(discountPercent)}%`;
+      row.querySelector(".discount-rate").textContent = hasSnackType ? `${discountFormatter.format(discountPercent)}%` : "—";
+      row.querySelector(".print-discount").textContent = hasSnackType ? `${discountFormatter.format(discountPercent)}%` : "—";
       row.querySelector(".print-amount").textContent = formatMoney(discountPaise);
       row.querySelector(".print-final").textContent = formatMoney(finalPaise);
+    }
+
+    function updateComplimentaryRewards(originalTotalPaise) {
+      const rewards = calculateComplimentaryRewards(originalTotalPaise, bunChoice.value);
+      rewardElements.gulabCard.classList.toggle("is-earned", rewards.gulabJamun);
+      rewardElements.gulabStatus.textContent = rewards.gulabJamun ? "Unlocked" : "Locked";
+      rewardElements.gulabMessage.textContent = rewards.gulabJamun
+        ? "A sweet treat is on us!"
+        : `Add ${formatMoney(23001n - originalTotalPaise)} more to unlock`;
+
+      rewardElements.bunCard.classList.toggle("is-earned", rewards.bunUnlocked);
+      rewardElements.bunStatus.hidden = rewards.bunUnlocked;
+      rewardElements.bunChoiceWrap.hidden = !rewards.bunUnlocked;
+      rewardElements.bunMessage.textContent = rewards.bunUnlocked
+        ? "Choose one complimentary bun."
+        : `Add ${formatMoney(25001n - originalTotalPaise)} more to unlock`;
+
+      const complimentaryItems = [];
+      if (rewards.gulabJamun) complimentaryItems.push("Gulab Jamun");
+      if (rewards.bunUnlocked) {
+        const bunName = rewards.selectedBun === "kova"
+          ? "Kova Bun"
+          : rewards.selectedBun === "muska"
+            ? "Muska Bun"
+            : "Kova Bun or Muska Bun (choice pending)";
+        complimentaryItems.push(bunName);
+      }
+      rewardElements.printSummary.textContent = complimentaryItems.length
+        ? `Complimentary: ${complimentaryItems.join(" + ")}`
+        : "No complimentary treats unlocked.";
     }
 
     function updateBill() {
@@ -172,15 +225,15 @@ if (typeof document !== "undefined") {
 
       for (const row of itemsBody.querySelectorAll(".item-row")) {
         const priceInput = row.querySelector(".item-price");
-        const discountInput = row.querySelector(".item-discount");
+        const snackType = row.querySelector(".item-type").value;
         const { originalPaise, discountPercent, discountPaise, finalPaise } = calculateLineItem(
           priceInput.value,
-          discountInput.value
+          snackType
         );
 
         row.querySelector(".item-discount-amount").textContent = formatMoney(discountPaise);
         row.querySelector(".item-final-price").textContent = formatMoney(finalPaise);
-        setPrintValues(row, originalPaise, discountPercent, discountPaise, finalPaise);
+        setPrintValues(row, snackType, originalPaise, discountPercent, discountPaise, finalPaise);
 
         originalTotalPaise += originalPaise;
         discountTotalPaise += discountPaise;
@@ -190,19 +243,21 @@ if (typeof document !== "undefined") {
       totalElements.original.textContent = formatMoney(originalTotalPaise);
       totalElements.discount.textContent = formatMoney(discountTotalPaise);
       totalElements.grand.textContent = formatMoney(grandTotalPaise);
+      updateComplimentaryRewards(originalTotalPaise);
 
       const count = itemsBody.querySelectorAll(".item-row").length;
       itemCount.textContent = `${count} ${count === 1 ? "item" : "items"}`;
     }
 
     function clearAllItems() {
-      const hasEnteredData = [...itemsBody.querySelectorAll(".item-row")].some((row) =>
-        [...row.querySelectorAll("input")].some((input) => input.value.trim() !== "")
+      const hasEnteredData = bunChoice.value !== "" || [...itemsBody.querySelectorAll(".item-row")].some((row) =>
+        [...row.querySelectorAll("input, select")].some((input) => input.value.trim() !== "")
       );
 
       if (hasEnteredData && !window.confirm("Clear all items and reset this bill?")) return;
 
       itemsBody.replaceChildren();
+      bunChoice.value = "";
       addItemRow();
       announcement.textContent = "Bill cleared. A new empty item is ready.";
       itemsBody.querySelector(".item-name").focus();
@@ -215,6 +270,7 @@ if (typeof document !== "undefined") {
     });
     document.querySelector("#clear-all").addEventListener("click", clearAllItems);
     document.querySelector("#print-bill").addEventListener("click", () => window.print());
+    bunChoice.addEventListener("change", updateBill);
 
     const now = new Date();
     const printedDate = new Intl.DateTimeFormat("en-IN", {
